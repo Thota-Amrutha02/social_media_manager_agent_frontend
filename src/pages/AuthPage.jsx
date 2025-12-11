@@ -1,20 +1,24 @@
+// src/pages/AuthPage.jsx
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-export default function LoginSignupPage() {
+export default function AuthPage({ onLogin }) {
   const [tab, setTab] = useState("login");
   const [toast, setToast] = useState(null);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  // ✅ Toast handler
+  // ✅ Toast helper
   function showToast(message, type = "success") {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 2000); // hides after 2 seconds
+    setTimeout(() => setToast(null), 2000);
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true);
 
+    // Read values from DOM (keeps your existing UI markup)
     const email =
       tab === "login"
         ? document.getElementById("login-email").value
@@ -23,20 +27,15 @@ export default function LoginSignupPage() {
       tab === "login"
         ? document.getElementById("login-password").value
         : document.getElementById("signup-password").value;
-    const name =
-      tab === "signup"
-        ? document.getElementById("signup-name").value
-        : null;
+    const name = tab === "signup" ? document.getElementById("signup-name").value : null;
 
     const payload =
       tab === "login"
         ? { username: email, password }
-        : { username: email, password, instagram_token: null };
+        : { username: email, password, name, instagram_token: null };
 
     const endpoint =
-      tab === "login"
-        ? "http://localhost:5000/auth/login"
-        : "http://localhost:5000/auth/signup";
+      tab === "login" ? "http://localhost:5000/auth/login" : "http://localhost:5000/auth/signup";
 
     try {
       const res = await fetch(endpoint, {
@@ -48,12 +47,15 @@ export default function LoginSignupPage() {
 
       if (data.success) {
         showToast(data.message || (tab === "login" ? "Login successful!" : "Signup successful!"), "success");
-        if (data.user) localStorage.setItem("user", JSON.stringify(data.user));
 
-        // Redirect to home page after 1.5 seconds
-        setTimeout(() => {
-          window.location.href = "/";
-        }, 1500);
+        // Use returned user if available, otherwise build basic user object
+        const userObj = data.user || { username: email, name: name || null, instagram_token: data.user?.instagram_token || null };
+
+        // Notify parent App to update auth state & persist
+        if (onLogin) onLogin(userObj);
+
+        // Navigate to /home (replace history so back doesn't go to auth)
+        navigate("/home", { replace: true });
       } else {
         showToast(data.message || "Something went wrong!", "error");
       }
@@ -181,7 +183,7 @@ export default function LoginSignupPage() {
           cursor: pointer;
         }
 
-        /* ✅ Toast styles */
+        /* Toast */
         .toast {
           position: fixed;
           top: 20px;
@@ -220,12 +222,14 @@ export default function LoginSignupPage() {
             <button
               className={`tab-btn ${tab === "login" ? "active" : ""}`}
               onClick={() => setTab("login")}
+              type="button"
             >
               Login
             </button>
             <button
               className={`tab-btn ${tab === "signup" ? "active" : ""}`}
               onClick={() => setTab("signup")}
+              type="button"
             >
               Sign up
             </button>
